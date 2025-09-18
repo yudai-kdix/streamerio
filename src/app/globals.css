@@ -1,0 +1,8 @@
+/* Tailwind 読み込み */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 最低限のリセット（必要に応じて拡張） */
+html, body { height: 100%; }
+
