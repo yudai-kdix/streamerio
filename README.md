@@ -2,7 +2,7 @@
 
 視聴者向け Web ページ。Next.js (App Router) ＋ Tailwind CSS を使用しています。
 
-必須環境: Node.js 18.18 以上（Next 15 要件）
+必須環境: Node.js 20.x（.nvmrc と engines に準拠）
 
 ## セットアップ
 1. 依存関係をインストール（Tailwind/ESLint9 を含む）

@@ -1,13 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+// 検索パラメータ依存＆クッキー読み取りのため、事前プリレンダーは行わない
+export const dynamic = "force-dynamic";
+
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { fetchViewerId, sendButtonEvent, type ButtonName } from "@/lib/api";
 import { getCookie, setCookie } from "@/lib/cookies";
 import ButtonGrid from "@/components/ButtonGrid";
 import { useSearchParams } from "next/navigation";
 
-// 視聴者向けページ
-export default function Page() {
+// 検索パラメータに依存する実処理を分離（Suspense でラップ）
+function ViewerContent() {
   const params = useSearchParams();
   const paramStreamerId = params.get("streamer_id");
 
@@ -70,10 +73,17 @@ export default function Page() {
     [backendUrl, streamerId, viewerId]
   );
 
+  return <ButtonGrid onClick={handleClick} />;
+}
+
+// 視聴者向けページ（外側で Suspense を付与）
+export default function Page() {
   return (
     <div className="min-h-screen flex flex-col">
       <header className="px-4 py-3 font-bold text-lg text-white bg-black/60">視聴者操作パネル</header>
-      <ButtonGrid onClick={handleClick} />
+      <Suspense fallback={<div className="text-white/80 px-4 py-3">読み込み中...</div>}>
+        <ViewerContent />
+      </Suspense>
     </div>
   );
 }
