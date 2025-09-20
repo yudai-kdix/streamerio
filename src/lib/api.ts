@@ -2,12 +2,55 @@
 
 export type ButtonName = "enemy1" | "enemy2" | "enemy3" | "skill1" | "skill2" | "skill3";
 
-export async function fetchViewerId(baseUrl: string): Promise<string | null> {
+export type ViewerSummary = {
+  viewerId: string;
+  counts: Record<ButtonName, number>;
+  total: number;
+};
+
+export type ViewerIdentity = {
+  viewerId: string;
+  name: string | null;
+};
+
+export type EventResultResponse = {
+  event_type: ButtonName;
+  current_count: number;
+  required_count: number;
+  effect_triggered: boolean;
+  viewer_count: number;
+  next_threshold: number;
+};
+
+export type GameOverResponse = {
+  game_over: true;
+  viewer_summary: {
+    viewer_id: string;
+    counts: Record<ButtonName, number>;
+    total: number;
+  };
+};
+
+export type SendButtonEventResponse = EventResultResponse | GameOverResponse;
+
+export type RoomResultResponse = {
+  game_over: true;
+  room_id: string;
+  ended_at: string;
+  top_by_event: Record<ButtonName, { viewer_id: string; count: number }>;
+  top_overall: { viewer_id: string; count: number } | null;
+  event_totals: Record<ButtonName, number>;
+  viewer_totals: Array<{ viewer_id: string; count: number }>;
+  viewer_summary?: GameOverResponse["viewer_summary"] | null;
+};
+
+export async function fetchViewerIdentity(baseUrl: string): Promise<ViewerIdentity | null> {
   try {
     const res = await fetch(`${baseUrl}/get_viewer_id`, { method: "GET", credentials: "include" });
     if (!res.ok) return null;
-    const data = await res.json().catch(() => null) as { viewer_id?: string } | null;
-    return data?.viewer_id ?? null;
+    const data = await res.json().catch(() => null) as { viewer_id?: string; name?: string } | null;
+    if (!data?.viewer_id) return null;
+    return { viewerId: data.viewer_id, name: data.name ?? null };
   } catch {
     return null;
   }
@@ -19,17 +62,59 @@ export async function sendButtonEvent(params: {
   streamerId: string;
   viewerId: string;
   buttonName: ButtonName;
-}) {
+}): Promise<SendButtonEventResponse | null> {
   const { baseUrl, roomId, streamerId, viewerId, buttonName } = params;
   const url = `${baseUrl}/api/rooms/${encodeURIComponent(roomId)}/events`;
-  await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      button_name: buttonName,
-      streamer_id: streamerId,
-      viewer_id: viewerId,
-    }),
-  });
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        button_name: buttonName,
+        streamer_id: streamerId,
+        viewer_id: viewerId,
+      }),
+    });
+    if (!res.ok) {
+      return null;
+    }
+    return res.json().catch(() => null) as Promise<SendButtonEventResponse | null>;
+  } catch {
+    return null;
+  }
 }
 
+export async function fetchRoomResult(params: {
+  baseUrl: string;
+  roomId: string;
+  viewerId?: string | null;
+}): Promise<RoomResultResponse | null> {
+  const { baseUrl, roomId, viewerId } = params;
+  const search = viewerId ? `?viewer_id=${encodeURIComponent(viewerId)}` : "";
+  try {
+    const res = await fetch(`${baseUrl}/api/rooms/${encodeURIComponent(roomId)}/results${search}`);
+    if (!res.ok) return null;
+    return await res.json().catch(() => null);
+  } catch {
+    return null;
+  }
+}
+
+export async function updateViewerName(params: {
+  baseUrl: string;
+  viewerId: string;
+  name: string;
+}): Promise<{ viewer_id: string; name: string } | null> {
+  const { baseUrl, viewerId, name } = params;
+  try {
+    const res = await fetch(`${baseUrl}/api/viewers/set_name`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ viewer_id: viewerId, name }),
+    });
+    if (!res.ok) return null;
+    return await res.json().catch(() => null);
+  } catch {
+    return null;
+  }
+}

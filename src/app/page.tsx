@@ -3,11 +3,11 @@
 // 検索パラメータ依存＆クッキー読み取りのため、事前プリレンダーは行わない
 export const dynamic = "force-dynamic";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { fetchViewerId, sendButtonEvent, type ButtonName } from "@/lib/api";
+import { Suspense, useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { fetchViewerIdentity, sendButtonEvent, updateViewerName, type ButtonName } from "@/lib/api";
 import { getCookie, setCookie } from "@/lib/cookies";
 import ButtonGrid from "@/components/ButtonGrid";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 // 検索パラメータに依存する実処理を分離（Suspense でラップ）
 function ViewerContent() {
@@ -17,29 +17,32 @@ function ViewerContent() {
   const backendUrl = useMemo(() => process.env.NEXT_PUBLIC_BACKEND_URL ?? "", []);
   const [streamerId, setStreamerId] = useState<string | null>(null);
   const [viewerId, setViewerId] = useState<string | null>(null);
+  const [viewerName, setViewerName] = useState<string | null>(null);
+  const [nameInput, setNameInput] = useState("");
+  const [savingName, setSavingName] = useState(false);
+  const [gameOver, setGameOver] = useState(false);
+  const router = useRouter();
+
+  const ensureViewer = useCallback(() => {
+    if (!backendUrl) return;
+    fetchViewerIdentity(backendUrl).then((identity) => {
+      if (!identity) return;
+      setViewerId(identity.viewerId);
+      setCookie("viewer_id", identity.viewerId);
+      setViewerName(identity.name ?? null);
+      setNameInput(identity.name ?? "");
+    });
+  }, [backendUrl]);
 
   // 初回ロード時に Cookie とクエリを突き合わせ、必要なら viewer_id を取得
   useEffect(() => {
     const cookieStreamer = getCookie("streamer_id");
-    const cookieViewer = getCookie("viewer_id");
 
     // クエリに streamer_id がある場合は最優先で採用
     if (paramStreamerId) {
       setStreamerId(paramStreamerId);
       setCookie("streamer_id", paramStreamerId);
-      if (!cookieViewer || cookieStreamer !== paramStreamerId) {
-        // 異なる配信者に切り替わった場合や viewer_id 未保存の場合は再取得
-        if (backendUrl) {
-          fetchViewerId(backendUrl).then((vid) => {
-            if (vid) {
-              setViewerId(vid);
-              setCookie("viewer_id", vid);
-            }
-          });
-        }
-      } else {
-        setViewerId(cookieViewer);
-      }
+      ensureViewer();
       return;
     }
 
@@ -47,43 +50,93 @@ function ViewerContent() {
     if (cookieStreamer) {
       setStreamerId(cookieStreamer);
     }
-    if (cookieViewer) {
-      setViewerId(cookieViewer);
-    } else if (backendUrl) {
-      fetchViewerId(backendUrl).then((vid) => {
-        if (vid) {
-          setViewerId(vid);
-          setCookie("viewer_id", vid);
-        }
-      });
-    }
-  }, [paramStreamerId, backendUrl]);
+    ensureViewer();
+  }, [paramStreamerId, backendUrl, ensureViewer]);
 
   const handleClick = useCallback(
     async (name: ButtonName) => {
-      if (!backendUrl || !streamerId || !viewerId) return;
-      await sendButtonEvent({
+      if (!backendUrl || !streamerId || !viewerId || gameOver) return;
+      const response = await sendButtonEvent({
         baseUrl: backendUrl,
         roomId: streamerId, // 仕様想定: rooms/{id} は streamer_id
         streamerId,
         viewerId,
         buttonName: name,
       });
+      if (response && "game_over" in response && response.game_over) {
+        setGameOver(true);
+        if (typeof window !== "undefined" && response.viewer_summary) {
+          const key = `result:${streamerId}:${viewerId}`;
+          sessionStorage.setItem(key, JSON.stringify(response.viewer_summary));
+        }
+        router.push(`/result/${encodeURIComponent(streamerId)}?viewer_id=${encodeURIComponent(viewerId)}`);
+      }
     },
-    [backendUrl, streamerId, viewerId]
+    [backendUrl, streamerId, viewerId, gameOver, router]
   );
 
-  return <ButtonGrid onClick={handleClick} />;
+  const handleNameSubmit = useCallback(
+    async (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (!backendUrl || !viewerId) return;
+      setSavingName(true);
+      const res = await updateViewerName({ baseUrl: backendUrl, viewerId, name: nameInput });
+      setSavingName(false);
+      if (!res) return;
+      const normalized = res.name?.trim() ?? "";
+      setViewerName(normalized || null);
+      setNameInput(normalized);
+    },
+    [backendUrl, viewerId, nameInput]
+  );
+
+  const isNameDirty = nameInput.trim() !== (viewerName ?? "");
+
+  return (
+    <div className="min-h-screen flex flex-col">
+      <header className="px-4 py-3 text-white bg-black/60 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div className="font-bold text-lg">視聴者操作パネル</div>
+        <form className="flex items-center gap-2" onSubmit={handleNameSubmit}>
+          <label className="text-sm text-white/80" htmlFor="viewer-name">
+            表示名
+          </label>
+          <input
+            id="viewer-name"
+            type="text"
+            value={nameInput}
+            onChange={(e) => setNameInput(e.target.value)}
+            className="rounded-md border border-white/30 bg-black/40 px-2 py-1 text-sm text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+            placeholder="名無し"
+            maxLength={24}
+            disabled={savingName}
+          />
+          <button
+            type="submit"
+            className="rounded-md bg-emerald-500 px-3 py-1 text-sm font-semibold text-black hover:bg-emerald-400 disabled:opacity-60"
+            disabled={savingName || !isNameDirty}
+          >
+            保存
+          </button>
+        </form>
+      </header>
+
+      <div className="relative flex-1">
+        <ButtonGrid onClick={handleClick} />
+        {gameOver ? (
+          <div className="absolute inset-0 bg-black/70 flex items-center justify-center text-white text-xl font-semibold">
+            ゲームが終了しました。リザルトを表示しています...
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 // 視聴者向けページ（外側で Suspense を付与）
 export default function Page() {
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="px-4 py-3 font-bold text-lg text-white bg-black/60">視聴者操作パネル</header>
-      <Suspense fallback={<div className="text-white/80 px-4 py-3">読み込み中...</div>}>
-        <ViewerContent />
-      </Suspense>
-    </div>
+    <Suspense fallback={<div className="text-white/80 px-4 py-3">読み込み中...</div>}>
+      <ViewerContent />
+    </Suspense>
   );
 }
