@@ -52,10 +52,10 @@ export default function ButtonGrid({ onClick }: Props) {
     // アイコンを一回り小さくするためパディングを増やす
     const pad =
       size === "sm"
-        ? kind === "enemy" ? "p-8" : "p-7"
+        ? (kind === "enemy" ? "p-6" : "p-5")
         : size === "md"
-          ? kind === "enemy" ? "p-6" : "p-5"
-          : kind === "enemy" ? "p-4" : "p-3";
+          ? (kind === "enemy" ? "p-4" : "p-3")
+          : (kind === "enemy" ? "p-2" : "p-1");
     const icon = kind === "skill" ? skillIcon : enemyIcon;
     return (
       <div className={boxCls}>
