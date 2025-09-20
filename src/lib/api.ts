@@ -2,8 +2,9 @@
 
 export type ButtonName = "enemy1" | "enemy2" | "enemy3" | "skill1" | "skill2" | "skill3";
 
-export type ViewerSummary = {
-  viewerId: string;
+export type ViewerSummaryPayload = {
+  viewer_id: string;
+  viewer_name?: string | null;
   counts: Record<ButtonName, number>;
   total: number;
 };
@@ -24,24 +25,32 @@ export type EventResultResponse = {
 
 export type GameOverResponse = {
   game_over: true;
-  viewer_summary: {
-    viewer_id: string;
-    counts: Record<ButtonName, number>;
-    total: number;
-  };
+  viewer_summary: ViewerSummaryPayload;
 };
 
 export type SendButtonEventResponse = EventResultResponse | GameOverResponse;
+
+export type ResultTopEntry = {
+  viewer_id: string;
+  viewer_name?: string | null;
+  count: number;
+};
+
+export type ViewerTotalsEntry = {
+  viewer_id: string;
+  viewer_name?: string | null;
+  count: number;
+};
 
 export type RoomResultResponse = {
   game_over: true;
   room_id: string;
   ended_at: string;
-  top_by_event: Record<ButtonName, { viewer_id: string; count: number }>;
-  top_overall: { viewer_id: string; count: number } | null;
+  top_by_event: Record<ButtonName, ResultTopEntry>;
+  top_overall: ResultTopEntry | null;
   event_totals: Record<ButtonName, number>;
-  viewer_totals: Array<{ viewer_id: string; count: number }>;
-  viewer_summary?: GameOverResponse["viewer_summary"] | null;
+  viewer_totals: ViewerTotalsEntry[];
+  viewer_summary?: ViewerSummaryPayload | null;
 };
 
 export async function fetchViewerIdentity(baseUrl: string): Promise<ViewerIdentity | null> {
@@ -104,7 +113,7 @@ export async function updateViewerName(params: {
   baseUrl: string;
   viewerId: string;
   name: string;
-}): Promise<{ viewer_id: string; name: string } | null> {
+}): Promise<{ viewer_id: string; name: string | null } | null> {
   const { baseUrl, viewerId, name } = params;
   try {
     const res = await fetch(`${baseUrl}/api/viewers/set_name`, {

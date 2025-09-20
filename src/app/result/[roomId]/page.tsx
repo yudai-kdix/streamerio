@@ -25,6 +25,11 @@ export default function ResultPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const resolveName = (id: string, name?: string | null) => {
+    const trimmed = name?.trim();
+    return trimmed && trimmed.length > 0 ? trimmed : id;
+  };
+
   useEffect(() => {
     if (!backendUrl || !roomId) return;
 
@@ -92,7 +97,7 @@ export default function ResultPage() {
               </p>
               {result.top_overall ? (
                 <p>
-                  最多参加: <span className="font-semibold">{result.top_overall.viewer_id}</span> ({result.top_overall.count}
+                  最多参加: <span className="font-semibold">{resolveName(result.top_overall.viewer_id, result.top_overall.viewer_name)}</span> ({result.top_overall.count}
                   回)
                 </p>
               ) : (
@@ -108,7 +113,9 @@ export default function ResultPage() {
                     <div className="text-sm text-white/60">{buttonLabels[key as ButtonName]}</div>
                     {info.viewer_id ? (
                       <div className="text-lg font-semibold">
-                        {info.viewer_id} <span className="text-sm font-normal text-white/70">({info.count}回)</span>
+                        {resolveName(info.viewer_id, info.viewer_name)}
+                        <span className="text-sm font-normal text-white/70">（{info.count}回）</span>
+                        <span className="block text-xs font-normal text-white/50">ID: {info.viewer_id}</span>
                       </div>
                     ) : (
                       <div className="text-white/70">該当なし</div>
@@ -126,9 +133,12 @@ export default function ResultPage() {
                 <ul className="divide-y divide-white/10 rounded-lg border border-white/10 bg-white/5">
                   {result.viewer_totals.map((viewer, index) => (
                     <li key={viewer.viewer_id + index} className="flex justify-between px-4 py-2">
-                      <span className="font-medium">
-                        {index + 1}. {viewer.viewer_id}
-                      </span>
+                      <div className="flex flex-col">
+                        <span className="font-medium">
+                          {index + 1}. {resolveName(viewer.viewer_id, viewer.viewer_name)}
+                        </span>
+                        <span className="text-xs font-normal text-white/50">ID: {viewer.viewer_id}</span>
+                      </div>
                       <span>{viewer.count} 回</span>
                     </li>
                   ))}
@@ -140,9 +150,12 @@ export default function ResultPage() {
               <h2 className="text-xl font-semibold">あなたの記録</h2>
               {viewerSummary && viewerId ? (
                 <div className="rounded-lg border border-emerald-400/40 bg-emerald-400/10 px-4 py-3 space-y-2">
-                  <p>
-                    viewer_id: <span className="font-semibold">{viewerSummary.viewer_id}</span>
-                  </p>
+                  <div className="flex flex-col gap-1">
+                    <span>
+                      表示名: <span className="font-semibold">{resolveName(viewerSummary.viewer_id, viewerSummary.viewer_name)}</span>
+                    </span>
+                    <span className="text-sm text-white/70">viewer_id: {viewerSummary.viewer_id}</span>
+                  </div>
                   <p>合計 {viewerSummary.total} 回</p>
                   <div className="grid grid-cols-2 gap-2">
                     {Object.entries(viewerSummary.counts).map(([key, value]) => (
@@ -174,4 +187,3 @@ export default function ResultPage() {
     </div>
   );
 }
-

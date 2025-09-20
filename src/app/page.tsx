@@ -23,14 +23,20 @@ function ViewerContent() {
   const [gameOver, setGameOver] = useState(false);
   const router = useRouter();
 
+  const trimmedInput = nameInput.trim();
+  const currentName = viewerName?.trim() ?? "";
+  const isNameDirty = trimmedInput !== currentName;
+  const effectiveName = viewerId ? (currentName || viewerId) : null;
+
   const ensureViewer = useCallback(() => {
     if (!backendUrl) return;
     fetchViewerIdentity(backendUrl).then((identity) => {
       if (!identity) return;
       setViewerId(identity.viewerId);
       setCookie("viewer_id", identity.viewerId);
-      setViewerName(identity.name ?? null);
-      setNameInput(identity.name ?? "");
+      const normalized = identity.name?.trim() ?? "";
+      setViewerName(normalized || null);
+      setNameInput(normalized);
     });
   }, [backendUrl]);
 
@@ -80,22 +86,23 @@ function ViewerContent() {
       event.preventDefault();
       if (!backendUrl || !viewerId) return;
       setSavingName(true);
-      const res = await updateViewerName({ baseUrl: backendUrl, viewerId, name: nameInput });
+      const res = await updateViewerName({ baseUrl: backendUrl, viewerId, name: trimmedInput });
       setSavingName(false);
       if (!res) return;
       const normalized = res.name?.trim() ?? "";
       setViewerName(normalized || null);
       setNameInput(normalized);
     },
-    [backendUrl, viewerId, nameInput]
+    [backendUrl, viewerId, trimmedInput]
   );
-
-  const isNameDirty = nameInput.trim() !== (viewerName ?? "");
 
   return (
     <div className="min-h-screen flex flex-col">
       <header className="px-4 py-3 text-white bg-black/60 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <div className="font-bold text-lg">視聴者操作パネル</div>
+        <div className="flex flex-col">
+          <span className="font-bold text-lg">視聴者操作パネル</span>
+          <span className="text-xs text-white/60">現在の表示名: {effectiveName ?? "取得中..."}</span>
+        </div>
         <form className="flex items-center gap-2" onSubmit={handleNameSubmit}>
           <label className="text-sm text-white/80" htmlFor="viewer-name">
             表示名
