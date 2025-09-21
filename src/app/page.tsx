@@ -100,7 +100,7 @@ function ViewerContent() {
     <div className="min-h-screen flex flex-col">
       <header className="px-4 py-3 text-white bg-black/60 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div className="flex flex-col">
-          <span className="font-bold text-lg">視聴者操作パネル</span>
+          <span className="font-bold text-lg">Streamerio - Viewer</span>
           <span className="text-xs text-white/60">
             現在の表示名: {effectiveName ?? "取得中..."}
           </span>
