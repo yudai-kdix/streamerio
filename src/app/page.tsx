@@ -101,7 +101,9 @@ function ViewerContent() {
       <header className="px-4 py-3 text-white bg-black/60 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div className="flex flex-col">
           <span className="font-bold text-lg">視聴者操作パネル</span>
-          <span className="text-xs text-white/60">現在の表示名: {effectiveName ?? "取得中..."}</span>
+          <span className="text-xs text-white/60">
+            現在の表示名: {effectiveName ?? "取得中..."}
+          </span>
         </div>
         <form className="flex items-center gap-2" onSubmit={handleNameSubmit}>
           <label className="text-sm text-white/80" htmlFor="viewer-name">
@@ -126,14 +128,15 @@ function ViewerContent() {
           </button>
         </form>
       </header>
-
-      <div className="relative flex-1">
-        <ButtonGrid onClick={handleClick} />
-        {gameOver ? (
-          <div className="absolute inset-0 bg-black/70 flex items-center justify-center text-white text-xl font-semibold">
-            ゲームが終了しました。リザルトを表示しています...
-          </div>
-        ) : null}
+      <div className="relative flex-1 overflow-hidden">
+        <div className="absolute inset-0">
+          <ButtonGrid onClick={handleClick} />
+          {gameOver ? (
+            <div className="absolute inset-0 bg-black/70 flex items-center justify-center text-white text-xl font-semibold">
+              ゲームが終了しました。リザルトを表示しています...
+            </div>
+          ) : null}
+        </div>
       </div>
     </div>
   );

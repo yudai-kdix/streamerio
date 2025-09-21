@@ -72,7 +72,7 @@ export default function ButtonGrid({ onClick }: Props) {
 
   return (
     <main
-      className="relative flex-1 flex flex-col items-center justify-center bg-cover bg-center overflow-hidden"
+      className="relative flex-1 h-full flex flex-col items-center justify-center bg-cover bg-center overflow-hidden"
       style={style}
     >
       {isLandscape ? (
