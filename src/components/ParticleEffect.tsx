@@ -33,6 +33,42 @@ export default function ParticleEffect({
   const animationIdRef = useRef<number | null>(null);
   const idCounterRef = useRef(0);
 
+  // Canvas のサイズを初期化・リサイズ時に更新
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const resizeCanvas = () => {
+      const dpr =
+        typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+      const w = typeof window !== "undefined" ? window.innerWidth : 0;
+      const h = typeof window !== "undefined" ? window.innerHeight : 0;
+
+      // デバイスピクセルレシオを考慮
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+
+      // Canvas のスタイルは物理ピクセルではなく CSS ピクセル
+      canvas.style.width = `${w}px`;
+      canvas.style.height = `${h}px`;
+
+      // コンテキストもスケーリング
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.scale(dpr, dpr);
+      }
+    };
+
+    resizeCanvas();
+    window.addEventListener("resize", resizeCanvas);
+    window.addEventListener("orientationchange", resizeCanvas);
+
+    return () => {
+      window.removeEventListener("resize", resizeCanvas);
+      window.removeEventListener("orientationchange", resizeCanvas);
+    };
+  }, []);
+
   useEffect(() => {
     if (!trigger) return;
 
@@ -40,7 +76,7 @@ export default function ParticleEffect({
     const newParticles: Particle[] = [];
     for (let i = 0; i < count; i++) {
       const angle = (i / count) * Math.PI * 2;
-      const speed = 3 + Math.random() * 6; // 広がりを大きくするためスピード増加
+      const speed = 5 + Math.random() * 6; // 広がりを大きくするためスピード増加
       newParticles.push({
         id: idCounterRef.current++,
         x,
@@ -105,10 +141,8 @@ export default function ParticleEffect({
   return (
     <canvas
       ref={canvasRef}
-      width={typeof window !== "undefined" ? window.innerWidth : 0}
-      height={typeof window !== "undefined" ? window.innerHeight : 0}
-      className="absolute inset-0 pointer-events-none"
-      style={{ width: "100%", height: "100%" }}
+      className="fixed inset-0 pointer-events-none"
+      style={{ left: 0, top: 0 }}
     />
   );
 }
