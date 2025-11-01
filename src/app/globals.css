@@ -4,5 +4,21 @@
 @tailwind utilities;
 
 /* 最低限のリセット（必要に応じて拡張） */
-html, body { height: 100%; }
+html, body {
+  height: 100%;
+}
 
+*,
+*::before,
+*::after {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+input,
+textarea,
+input *,
+textarea * {
+  user-select: text;
+  -webkit-user-select: text;
+}
