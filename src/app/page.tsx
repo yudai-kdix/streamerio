@@ -4,10 +4,11 @@
 export const dynamic = "force-dynamic";
 
 import { Suspense, useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { fetchViewerIdentity, sendButtonEvent, updateViewerName, type ButtonName } from "@/lib/api";
+import { fetchViewerIdentity, updateViewerName, type GameOverResponse } from "@/lib/api";
 import { getCookie, setCookie } from "@/lib/cookies";
 import ButtonGrid from "@/components/ButtonGrid";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useBufferedButtonEvents } from "@/lib/useBufferedButtonEvents";
 
 // 検索パラメータに依存する実処理を分離（Suspense でラップ）
 function ViewerContent() {
@@ -59,27 +60,28 @@ function ViewerContent() {
     ensureViewer();
   }, [paramStreamerId, backendUrl, ensureViewer]);
 
-  const handleClick = useCallback(
-    async (name: ButtonName) => {
-      if (!backendUrl || !streamerId || !viewerId || gameOver) return;
-      const response = await sendButtonEvent({
-        baseUrl: backendUrl,
-        roomId: streamerId, // 仕様想定: rooms/{id} は streamer_id
-        streamerId,
-        viewerId,
-        buttonName: name,
-      });
-      if (response && "game_over" in response && response.game_over) {
-        setGameOver(true);
-        if (typeof window !== "undefined" && response.viewer_summary) {
-          const key = `result:${streamerId}:${viewerId}`;
-          sessionStorage.setItem(key, JSON.stringify(response.viewer_summary));
-        }
-        router.push(`/result/${encodeURIComponent(streamerId)}?viewer_id=${encodeURIComponent(viewerId)}`);
+  const handleGameOver = useCallback(
+    (payload: GameOverResponse) => {
+      if (!streamerId || !viewerId) return;
+      setGameOver(true);
+      if (typeof window !== "undefined" && payload.viewer_summary) {
+        const key = `result:${streamerId}:${viewerId}`;
+        sessionStorage.setItem(key, JSON.stringify(payload.viewer_summary));
       }
+      router.push(`/result/${encodeURIComponent(streamerId)}?viewer_id=${encodeURIComponent(viewerId)}`);
     },
-    [backendUrl, streamerId, viewerId, gameOver, router]
+    [router, streamerId, viewerId]
   );
+
+  const queueButtonEvent = useBufferedButtonEvents({
+    backendUrl,
+    roomId: streamerId,
+    viewerId,
+    gameOver,
+    onGameOver: handleGameOver,
+  });
+
+  const handleClick = queueButtonEvent;
 
   const handleNameSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {

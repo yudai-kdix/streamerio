@@ -28,7 +28,14 @@ export type GameOverResponse = {
   viewer_summary: ViewerSummaryPayload;
 };
 
-export type SendButtonEventResponse = EventResultResponse | GameOverResponse;
+export type PushEventPayload = {
+  button_name: ButtonName;
+  push_count: number;
+};
+
+export type SendButtonEventsResponse =
+  | { event_results: EventResultResponse[]; game_over?: false }
+  | (GameOverResponse & { event_results?: EventResultResponse[] });
 
 export type ResultTopEntry = {
   viewer_id: string;
@@ -65,29 +72,27 @@ export async function fetchViewerIdentity(baseUrl: string): Promise<ViewerIdenti
   }
 }
 
-export async function sendButtonEvent(params: {
+export async function sendButtonEvents(params: {
   baseUrl: string;
   roomId: string; // 通常は streamer_id を使用
-  streamerId: string;
   viewerId: string;
-  buttonName: ButtonName;
-}): Promise<SendButtonEventResponse | null> {
-  const { baseUrl, roomId, streamerId, viewerId, buttonName } = params;
+  pushEvents: PushEventPayload[];
+}): Promise<SendButtonEventsResponse | null> {
+  const { baseUrl, roomId, viewerId, pushEvents } = params;
   const url = `${baseUrl}/api/rooms/${encodeURIComponent(roomId)}/events`;
   try {
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        button_name: buttonName,
-        streamer_id: streamerId,
         viewer_id: viewerId,
+        push_events: pushEvents,
       }),
     });
     if (!res.ok) {
       return null;
     }
-    return res.json().catch(() => null) as Promise<SendButtonEventResponse | null>;
+    return res.json().catch(() => null) as Promise<SendButtonEventsResponse | null>;
   } catch {
     return null;
   }
