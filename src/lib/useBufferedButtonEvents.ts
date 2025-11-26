@@ -18,7 +18,7 @@ const BUTTON_NAMES: ButtonName[] = [
 /** イベント送信間隔（ミリ秒） */
 const FLUSH_INTERVAL_MS = 1500;
 /** ハートビート送信間隔（ミリ秒） */
-const HEARTBEAT_INTERVAL_MS = 6000;
+const HEARTBEAT_INTERVAL_MS = 1500;
 
 function createEmptyPushCounts(): Record<ButtonName, number> {
   // 全ボタンの押下カウントを初期化（ゼロ）
@@ -43,6 +43,8 @@ type BufferedEventsOptions = {
   gameOver: boolean;
   // ゲーム終了時のコールバック
   onGameOver: (payload: GameOverResponse) => void;
+  // 視聴者数更新時のコールバック
+  onViewerCountUpdate?: (count: number) => void;
 };
 
 export function useBufferedButtonEvents({
@@ -51,6 +53,7 @@ export function useBufferedButtonEvents({
   viewerId,
   gameOver,
   onGameOver,
+  onViewerCountUpdate,
 }: BufferedEventsOptions): (name: ButtonName) => void {
   // ボタン押下のペンディングカウント
   const pendingCountsRef = useRef<Record<ButtonName, number>>(
@@ -69,16 +72,16 @@ export function useBufferedButtonEvents({
   const queueButtonEvent = useCallback(
     (name: ButtonName) => {
       // 必要な情報が揃っていないか、ゲーム終了時は処理しない
-      if (!backendUrl || !roomId || !viewerId || gameOver) return;
+      if (!roomId || !viewerId || gameOver) return;
       // ボタン押下をカウント
       pendingCountsRef.current[name] += 1;
     },
-    [backendUrl, roomId, viewerId, gameOver]
+    [roomId, viewerId, gameOver]
   );
 
   useEffect(() => {
     // 必要な情報が揃っていない場合は処理を終了
-    if (!backendUrl || !roomId || !viewerId || gameOver) {
+    if (!roomId || !viewerId || gameOver) {
       return;
     }
 
@@ -123,7 +126,7 @@ export function useBufferedButtonEvents({
       try {
         // バックエンドにイベントを送信
         const response = await sendButtonEvents({
-          baseUrl: backendUrl,
+          baseUrl: backendUrl ?? "",
           roomId,
           viewerId,
           pushEvents: events,
@@ -131,6 +134,13 @@ export function useBufferedButtonEvents({
 
         if (!response) {
           throw new Error("Failed to send events");
+        }
+
+        // 視聴者数の更新
+        if (onViewerCountUpdate && response.event_results && response.event_results.length > 0) {
+          // どのイベント結果にも同じ視聴者数が入っているはずなので先頭を使用
+          const count = response.event_results[0].viewer_count;
+          onViewerCountUpdate(count);
         }
 
         // 最後の送信時刻を更新
@@ -177,7 +187,7 @@ export function useBufferedButtonEvents({
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [backendUrl, roomId, viewerId, gameOver, onGameOver]);
+  }, [backendUrl, roomId, viewerId, gameOver, onGameOver, onViewerCountUpdate]);
 
   // ボタン押下をキューに追加する関数を返す
   return queueButtonEvent;

@@ -3,12 +3,13 @@
 // 検索パラメータ依存＆クッキー読み取りのため、事前プリレンダーは行わない
 export const dynamic = "force-dynamic";
 
-import { Suspense, useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import ButtonGrid from "@/components/ButtonGrid";
+import ViewerCountDisplay from "@/components/ViewerCountDisplay";
 import { fetchViewerIdentity, updateViewerName, type GameOverResponse } from "@/lib/api";
 import { getCookie, setCookie } from "@/lib/cookies";
-import ButtonGrid from "@/components/ButtonGrid";
-import { useRouter, useSearchParams } from "next/navigation";
 import { useBufferedButtonEvents } from "@/lib/useBufferedButtonEvents";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 
 // 検索パラメータに依存する実処理を分離（Suspense でラップ）
 function ViewerContent() {
@@ -22,6 +23,7 @@ function ViewerContent() {
   const [nameInput, setNameInput] = useState("");
   const [savingName, setSavingName] = useState(false);
   const [gameOver, setGameOver] = useState(false);
+  const [viewerCount, setViewerCount] = useState<number | null>(null);
   const router = useRouter();
 
   const trimmedInput = nameInput.trim();
@@ -30,7 +32,7 @@ function ViewerContent() {
   const effectiveName = viewerId ? (currentName || viewerId) : null;
 
   const ensureViewer = useCallback(() => {
-    if (!backendUrl) return;
+    // backendUrl can be empty (relative path)
     fetchViewerIdentity(backendUrl).then((identity) => {
       if (!identity) return;
       setViewerId(identity.viewerId);
@@ -79,6 +81,7 @@ function ViewerContent() {
     viewerId,
     gameOver,
     onGameOver: handleGameOver,
+    onViewerCountUpdate: setViewerCount,
   });
 
   const handleClick = queueButtonEvent;
@@ -86,7 +89,7 @@ function ViewerContent() {
   const handleNameSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      if (!backendUrl || !viewerId) return;
+      if (!viewerId) return;
       setSavingName(true);
       const res = await updateViewerName({ baseUrl: backendUrl, viewerId, name: trimmedInput });
       setSavingName(false);
@@ -132,6 +135,7 @@ function ViewerContent() {
       </header>
       <div className="relative flex-1 overflow-hidden">
         <div className="absolute inset-0">
+          <ViewerCountDisplay latestCount={viewerCount} />
           <ButtonGrid onClick={handleClick} />
           {gameOver ? (
             <div className="absolute inset-0 bg-black/70 flex items-center justify-center text-white text-xl font-semibold">
