@@ -34,8 +34,8 @@ export type PushEventPayload = {
 };
 
 export type SendButtonEventsResponse =
-  | { event_results: EventResultResponse[]; game_over?: false }
-  | (GameOverResponse & { event_results?: EventResultResponse[] });
+  | { event_results: EventResultResponse[]; stats: RoomStat[]; game_over?: false }
+  | (GameOverResponse & { event_results?: EventResultResponse[]; stats?: RoomStat[]; });
 
 export type ResultTopEntry = {
   viewer_id: string;

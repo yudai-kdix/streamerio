@@ -7,7 +7,6 @@ import ButtonGrid from "@/components/ButtonGrid";
 import OnboardingModal, { type OnboardingStep } from "@/components/OnboardingModal";
 import ViewerCountDisplay from "@/components/ViewerCountDisplay";
 import {
-  fetchRoomStats,
   fetchViewerIdentity,
   updateViewerName,
   type ButtonName,
@@ -93,29 +92,6 @@ function ViewerContent() {
     ensureViewer();
   }, [paramStreamerId, backendUrl, ensureViewer]);
 
-  // 定期的に統計情報を取得する Effect (0.5秒間隔)
-  useEffect(() => {
-    if (!backendUrl || !streamerId || gameOver) return;
-
-    const updateStats = async () => {
-      const data = await fetchRoomStats(backendUrl, streamerId);
-      if (data && data.stats) {
-        const newStats: Partial<Record<ButtonName, RoomStat>> = {};
-        data.stats.forEach((s) => {
-          newStats[s.event_type] = s;
-        });
-        setStats((prev) => ({ ...prev, ...newStats }));
-      }
-    };
-
-    // 初回実行
-    updateStats();
-    // ポーリング開始
-    const intervalId = setInterval(updateStats, 500);
-
-    return () => clearInterval(intervalId);
-  }, [backendUrl, streamerId, gameOver]);
-
   const handleGameOver = useCallback(
     (payload: GameOverResponse) => {
       if (!streamerId || !viewerId) return;
@@ -129,6 +105,21 @@ function ViewerContent() {
     [router, streamerId, viewerId]
   );
 
+  // POSTレスポンスから統計情報を更新する関数
+  const handleStatsUpdate = useCallback((newStats: RoomStat[]) => {
+    setStats((prev) => {
+      // 変数名を 'newStats' から 'nextStats' に変更して重複を回避
+      const nextStats: Partial<Record<ButtonName, RoomStat>> = {};
+
+      // 引数の 'newStats' (配列) をループさせる
+      newStats.forEach((s) => {
+        nextStats[s.event_type] = s;
+      });
+
+      return { ...prev, ...nextStats } as Record<ButtonName, RoomStat | undefined>;
+    });
+  }, []);
+
   const queueButtonEvent = useBufferedButtonEvents({
     backendUrl,
     roomId: streamerId,
@@ -137,6 +128,7 @@ function ViewerContent() {
     gameOver,
     onGameOver: handleGameOver,
     onViewerCountUpdate: setViewerCount,
+    onStatsUpdate: handleStatsUpdate,
   });
 
   const saveName = useCallback(async () => {

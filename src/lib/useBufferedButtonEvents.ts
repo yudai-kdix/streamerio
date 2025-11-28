@@ -1,7 +1,9 @@
+
 import {
   sendButtonEvents,
   type ButtonName,
   type GameOverResponse,
+  type RoomStat,
 } from "@/lib/api";
 import { useCallback, useEffect, useRef } from "react";
 
@@ -47,6 +49,8 @@ type BufferedEventsOptions = {
   onGameOver: (payload: GameOverResponse) => void;
   // 視聴者数更新時のコールバック
   onViewerCountUpdate?: (count: number) => void;
+  // 統計情報更新時のコールバック
+  onStatsUpdate?: (stats: RoomStat[]) => void;
 };
 
 export function useBufferedButtonEvents({
@@ -57,6 +61,7 @@ export function useBufferedButtonEvents({
   gameOver,
   onGameOver,
   onViewerCountUpdate,
+  onStatsUpdate,
 }: BufferedEventsOptions): (name: ButtonName) => void {
   // ボタン押下のペンディングカウント
   const pendingCountsRef = useRef<Record<ButtonName, number>>(
@@ -147,6 +152,11 @@ export function useBufferedButtonEvents({
           onViewerCountUpdate(count);
         }
 
+        // 統計情報の更新
+        if (onStatsUpdate && (response as any).stats) {
+          onStatsUpdate((response as any).stats);
+        }
+
         // 最後の送信時刻を更新
         lastFlushAtRef.current = Date.now();
 
@@ -191,8 +201,9 @@ export function useBufferedButtonEvents({
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [backendUrl, roomId, viewerId, viewerName, gameOver, onGameOver, onViewerCountUpdate]);
+  }, [backendUrl, roomId, viewerId, viewerName, gameOver, onGameOver, onViewerCountUpdate, onStatsUpdate]);
 
   // ボタン押下をキューに追加する関数を返す
   return queueButtonEvent;
 }
+
