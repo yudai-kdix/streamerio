@@ -109,7 +109,7 @@ function ViewerContent() {
     // 初回実行
     updateStats();
     // ポーリング開始
-    const intervalId = setInterval(updateStats, 1000);
+    const intervalId = setInterval(updateStats, 500);
 
     return () => clearInterval(intervalId);
   }, [backendUrl, streamerId, gameOver]);
