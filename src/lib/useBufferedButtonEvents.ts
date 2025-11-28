@@ -1,3 +1,4 @@
+
 import {
   sendButtonEvents,
   type ButtonName,
@@ -46,6 +47,8 @@ type BufferedEventsOptions = {
   gameOver: boolean;
   // ゲーム終了時のコールバック
   onGameOver: (payload: GameOverResponse) => void;
+  // 視聴者数更新時のコールバック
+  onViewerCountUpdate?: (count: number) => void;
   // 統計情報更新時のコールバック
   onStatsUpdate?: (stats: RoomStat[]) => void;
 };
@@ -57,6 +60,7 @@ export function useBufferedButtonEvents({
   viewerName,
   gameOver,
   onGameOver,
+  onViewerCountUpdate,
   onStatsUpdate,
 }: BufferedEventsOptions): (name: ButtonName) => void {
   // ボタン押下のペンディングカウント
@@ -76,16 +80,16 @@ export function useBufferedButtonEvents({
   const queueButtonEvent = useCallback(
     (name: ButtonName) => {
       // 必要な情報が揃っていないか、ゲーム終了時は処理しない
-      if (!backendUrl || !roomId || !viewerId || gameOver) return;
+      if (!roomId || !viewerId || gameOver) return;
       // ボタン押下をカウント
       pendingCountsRef.current[name] += 1;
     },
-    [backendUrl, roomId, viewerId, gameOver]
+    [roomId, viewerId, gameOver]
   );
 
   useEffect(() => {
     // 必要な情報が揃っていない場合は処理を終了
-    if (!backendUrl || !roomId || !viewerId || gameOver) {
+    if (!roomId || !viewerId || gameOver) {
       return;
     }
 
@@ -130,7 +134,7 @@ export function useBufferedButtonEvents({
       try {
         // バックエンドにイベントを送信
         const response = await sendButtonEvents({
-          baseUrl: backendUrl,
+          baseUrl: backendUrl ?? "",
           roomId,
           viewerId,
           viewerName,
@@ -141,13 +145,20 @@ export function useBufferedButtonEvents({
           throw new Error("Failed to send events");
         }
 
-        // 最後の送信時刻を更新
-        lastFlushAtRef.current = Date.now();
+        // 視聴者数の更新
+        if (onViewerCountUpdate && response.event_results && response.event_results.length > 0) {
+          // どのイベント結果にも同じ視聴者数が入っているはずなので先頭を使用
+          const count = response.event_results[0].viewer_count;
+          onViewerCountUpdate(count);
+        }
 
         // 統計情報の更新
-        if (response.stats && onStatsUpdate) {
-          onStatsUpdate(response.stats);
+        if (onStatsUpdate && (response as any).stats) {
+          onStatsUpdate((response as any).stats);
         }
+
+        // 最後の送信時刻を更新
+        lastFlushAtRef.current = Date.now();
 
         // ゲーム終了レスポンスの処理
         if ("game_over" in response && response.game_over) {
@@ -190,8 +201,9 @@ export function useBufferedButtonEvents({
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [backendUrl, roomId, viewerId,viewerName, gameOver, onGameOver, onStatsUpdate]);
+  }, [backendUrl, roomId, viewerId, viewerName, gameOver, onGameOver, onViewerCountUpdate, onStatsUpdate]);
 
   // ボタン押下をキューに追加する関数を返す
   return queueButtonEvent;
 }
+

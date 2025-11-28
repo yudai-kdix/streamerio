@@ -3,21 +3,20 @@
 // 検索パラメータ依存＆クッキー読み取りのため、事前プリレンダーは行わない
 export const dynamic = "force-dynamic";
 
-import { Suspense, useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import ButtonGrid from "@/components/ButtonGrid";
+import OnboardingModal, { type OnboardingStep } from "@/components/OnboardingModal";
+import ViewerCountDisplay from "@/components/ViewerCountDisplay";
 import {
   fetchViewerIdentity,
   updateViewerName,
-  fetchRoomStats,
   type ButtonName,
   type GameOverResponse,
   type RoomStat,
-  type EventResultResponse,
 } from "@/lib/api";
 import { getCookie, setCookie } from "@/lib/cookies";
-import ButtonGrid from "@/components/ButtonGrid";
-import OnboardingModal, { type OnboardingStep } from "@/components/OnboardingModal";
-import { useRouter, useSearchParams } from "next/navigation";
 import { useBufferedButtonEvents } from "@/lib/useBufferedButtonEvents";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 
 // 検索パラメータに依存する実処理を分離（Suspense でラップ）
 function ViewerContent() {
@@ -31,6 +30,7 @@ function ViewerContent() {
   const [nameInput, setNameInput] = useState("");
   const [savingName, setSavingName] = useState(false);
   const [gameOver, setGameOver] = useState(false);
+  const [viewerCount, setViewerCount] = useState<number | null>(null);
   const [isGuideOpen, setIsGuideOpen] = useState(true);
   const [guideStep, setGuideStep] = useState(0);
   const router = useRouter();
@@ -62,7 +62,7 @@ function ViewerContent() {
   }, [viewerName]);
 
   const ensureViewer = useCallback(() => {
-    if (!backendUrl) return;
+    // backendUrl can be empty (relative path)
     fetchViewerIdentity(backendUrl).then((identity) => {
       if (!identity) return;
       setViewerId(identity.viewerId);
@@ -127,6 +127,7 @@ function ViewerContent() {
     viewerName,
     gameOver,
     onGameOver: handleGameOver,
+    onViewerCountUpdate: setViewerCount,
     onStatsUpdate: handleStatsUpdate,
   });
 
@@ -299,6 +300,7 @@ function ViewerContent() {
       </header>
       <div className="relative flex-1 overflow-hidden">
         <div className="absolute inset-0">
+          <ViewerCountDisplay latestCount={viewerCount} />
           <ButtonGrid onClick={handleClick} stats={stats} />
           {gameOver ? (
             <div className="absolute inset-0 bg-black/70 flex items-center justify-center text-white text-xl font-semibold">
