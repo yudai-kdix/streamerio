@@ -39,6 +39,8 @@ type BufferedEventsOptions = {
   roomId: string | null | undefined;
   // 視聴者ID
   viewerId: string | null | undefined;
+  // 視聴者名
+  viewerName:string| null | undefined;
   // ゲーム終了状態
   gameOver: boolean;
   // ゲーム終了時のコールバック
@@ -51,6 +53,7 @@ export function useBufferedButtonEvents({
   backendUrl,
   roomId,
   viewerId,
+  viewerName,
   gameOver,
   onGameOver,
   onViewerCountUpdate,
@@ -129,6 +132,7 @@ export function useBufferedButtonEvents({
           baseUrl: backendUrl ?? "",
           roomId,
           viewerId,
+          viewerName,
           pushEvents: events,
         });
 
@@ -187,7 +191,7 @@ export function useBufferedButtonEvents({
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [backendUrl, roomId, viewerId, gameOver, onGameOver, onViewerCountUpdate]);
+  }, [backendUrl, roomId, viewerId, viewerName, gameOver, onGameOver, onViewerCountUpdate]);
 
   // ボタン押下をキューに追加する関数を返す
   return queueButtonEvent;
