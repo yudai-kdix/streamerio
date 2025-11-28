@@ -7,8 +7,10 @@ import { Suspense, useCallback, useEffect, useMemo, useState, type FormEvent } f
 import {
   fetchViewerIdentity,
   updateViewerName,
+  fetchRoomStats,
   type ButtonName,
   type GameOverResponse,
+  type RoomStat,
 } from "@/lib/api";
 import { getCookie, setCookie } from "@/lib/cookies";
 import ButtonGrid from "@/components/ButtonGrid";
@@ -31,6 +33,16 @@ function ViewerContent() {
   const [isGuideOpen, setIsGuideOpen] = useState(true);
   const [guideStep, setGuideStep] = useState(0);
   const router = useRouter();
+
+  // 統計情報管理用の state
+  const [stats, setStats] = useState<Record<ButtonName, RoomStat | undefined>>({
+    enemy1: undefined,
+    enemy2: undefined,
+    enemy3: undefined,
+    skill1: undefined,
+    skill2: undefined,
+    skill3: undefined,
+  });
 
   const trimmedInput = nameInput.trim();
   const currentName = viewerName?.trim() ?? "";
@@ -78,6 +90,29 @@ function ViewerContent() {
     }
     ensureViewer();
   }, [paramStreamerId, backendUrl, ensureViewer]);
+
+  // 定期的に統計情報を取得する Effect (0.5秒間隔)
+  useEffect(() => {
+    if (!backendUrl || !streamerId || gameOver) return;
+
+    const updateStats = async () => {
+      const data = await fetchRoomStats(backendUrl, streamerId);
+      if (data && data.stats) {
+        const newStats: Partial<Record<ButtonName, RoomStat>> = {};
+        data.stats.forEach((s) => {
+          newStats[s.event_type] = s;
+        });
+        setStats((prev) => ({ ...prev, ...newStats }));
+      }
+    };
+
+    // 初回実行
+    updateStats();
+    // ポーリング開始
+    const intervalId = setInterval(updateStats, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [backendUrl, streamerId, gameOver]);
 
   const handleGameOver = useCallback(
     (payload: GameOverResponse) => {
@@ -270,7 +305,7 @@ function ViewerContent() {
       </header>
       <div className="relative flex-1 overflow-hidden">
         <div className="absolute inset-0">
-          <ButtonGrid onClick={handleClick} />
+          <ButtonGrid onClick={handleClick} stats={stats} />
           {gameOver ? (
             <div className="absolute inset-0 bg-black/70 flex items-center justify-center text-white text-xl font-semibold">
               ゲームが終了しました。リザルトを表示しています...
