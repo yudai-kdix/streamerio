@@ -96,6 +96,7 @@ function ViewerContent() {
     backendUrl,
     roomId: streamerId,
     viewerId,
+    viewerName,
     gameOver,
     onGameOver: handleGameOver,
   });

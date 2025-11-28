@@ -76,9 +76,10 @@ export async function sendButtonEvents(params: {
   baseUrl: string;
   roomId: string; // 通常は streamer_id を使用
   viewerId: string;
+  viewerName?: string | null;
   pushEvents: PushEventPayload[];
 }): Promise<SendButtonEventsResponse | null> {
-  const { baseUrl, roomId, viewerId, pushEvents } = params;
+  const { baseUrl, roomId, viewerId,viewerName, pushEvents } = params;
   const url = `${baseUrl}/api/rooms/${encodeURIComponent(roomId)}/events`;
   try {
     const res = await fetch(url, {
@@ -86,6 +87,7 @@ export async function sendButtonEvents(params: {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         viewer_id: viewerId,
+        viewer_name:viewerName,
         push_events: pushEvents,
       }),
     });
