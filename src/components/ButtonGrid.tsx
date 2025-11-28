@@ -27,7 +27,7 @@ type ParticleEvent = {
 // 数値を滑らかに補間するフック
 function useSmoothValue(targetValue: number, duration: number = 1000) {
   const [displayValue, setDisplayValue] = useState(targetValue);
-  
+
   const displayValueRef = useRef(targetValue);
   const startValueRef = useRef(targetValue);
   const targetValueRef = useRef(targetValue);
@@ -46,7 +46,7 @@ function useSmoothValue(targetValue: number, duration: number = 1000) {
     const loop = (time: number) => {
       if (startTimeRef.current === null) startTimeRef.current = time;
       const elapsed = time - startTimeRef.current;
-      
+
       const progress = Math.min(elapsed / duration, 1.0);
       const ease = 1 - Math.pow(1 - progress, 3); // Ease-out
 
@@ -79,12 +79,14 @@ const ButtonItem = ({
   size,
   stats,
   priority,
+  currentCount,
 }: {
   name: ButtonName;
   kind: "skill" | "enemy";
   size: "sm" | "md" | "lg";
   stats?: Record<ButtonName, RoomStat | undefined>;
   priority?: boolean;
+  currentCount: number;
 }) => {
   const boxCls =
     "relative w-[clamp(80px,22vmin,140px)] h-[clamp(80px,22vmin,140px)]";
@@ -102,10 +104,18 @@ const ButtonItem = ({
   const barColor = kind === "skill" ? "bg-yellow-400" : "bg-red-500";
 
   const stat = stats?.[name];
-  const rawProgress = stat?.progress ?? 0;
+  const threshold = stat?.required_count || 1;
+  
+  const rawRatio = currentCount / threshold;
 
   // アニメーション適用 (800ms)
-  const smoothProgress = useSmoothValue(rawProgress, 800);
+  // 1.0 を超えた値もそのままアニメーションさせる
+  const smoothRatio = useSmoothValue(rawRatio, 800);
+
+  // 表示時に 1.0 を超えた端数を計算する (% 1)
+  // 例: 1.2 (120%) -> 0.2 (20%) として表示
+  // これにより、ゲージがいっぱいになった後、また0から溜まっていくように見えます
+  const widthPercent = (smoothRatio % 1) * 100;
 
   return (
     <div className="flex flex-col items-center gap-2">
@@ -129,7 +139,7 @@ const ButtonItem = ({
         <div className="relative w-full h-3 bg-black/60 rounded-full overflow-hidden border border-white/20 backdrop-blur-sm shadow-inner">
           <div
             className={`h-full ${barColor} shadow-[0_0_10px_rgba(255,255,255,0.4)]`}
-            style={{ width: `${Math.min(smoothProgress * 100, 100)}%` }}
+            style={{ width: `${widthPercent}%` }}
           />
         </div>
       </div>
@@ -141,8 +151,56 @@ const ButtonItem = ({
 export default function ButtonGrid({ onClick, stats }: Props) {
   const [isLandscape, setIsLandscape] = useState(false);
   const [particles, setParticles] = useState<ParticleEvent[]>([]);
+
+  // ローカルでのボタン押下数を管理するState
+  // 初期値はすべてのボタンで 0
+  const [visualCounts, setVisualCounts] = useState<Record<ButtonName, number>>({
+    skill1: 0, skill2: 0, skill3: 0,
+    enemy1: 0, enemy2: 0, enemy3: 0,
+  });
+
+  const lastServerCounts = useRef<Record<ButtonName, number>>({
+    skill1: 0, skill2: 0, skill3: 0,
+    enemy1: 0, enemy2: 0, enemy3: 0,
+  });
+
   const { vibrate } = useVibration();
   const particleIdRef = useRef(0);
+
+  // ローカルカウントをリセットしてサーバーの値に合わせる
+  useEffect(() => {
+    setVisualCounts(prev => {
+      const next = { ...prev };
+      let changed = false;
+
+      (Object.keys(next) as ButtonName[]).forEach(key => {
+        const serverStat = stats?.[key];
+        const serverCount = serverStat?.current_count ?? 0;
+        const lastServerCount = lastServerCounts.current[key];
+        const currentVisual = prev[key];
+
+        let newVisual = currentVisual;
+
+        if (serverCount < lastServerCount) {
+           // 1. サーバーの値が減った = リセット発生 -> 強制同期
+          newVisual = serverCount;
+        } else {
+          // 2. サーバーの値が増えた or 同じ -> 大きい方を採用 (先行入力を維持)
+          // これにより「通信遅延でサーバーの値がまだ古くても」ゲージが減らない
+          newVisual = Math.max(currentVisual, serverCount);
+        }
+
+        if (newVisual !== currentVisual) {
+          next[key] = newVisual;
+          changed = true;
+        }
+        // 次回比較用に保存
+        lastServerCounts.current[key] = serverCount;
+      });
+
+      return changed ? next : prev;
+    });
+  }, [stats]);
 
   // 端末の向きを検出して背景とレイアウトを切替
   useEffect(() => {
@@ -170,6 +228,12 @@ export default function ButtonGrid({ onClick, stats }: Props) {
 
       // バイブレーション（弱め: 30ms）
       vibrate(30);
+
+      // ローカルカウントを即座に増やす（見た目用）
+      setVisualCounts((prev) => ({
+        ...prev,
+        [buttonName]: prev[buttonName] + 1,
+      }));
 
       // ボタンの種類に応じてパーティクルの色を決定
       const isSkill = buttonName.startsWith("skill");
@@ -235,19 +299,19 @@ export default function ButtonGrid({ onClick, stats }: Props) {
               className="translate-x-1"
               onClick={(e) => handleButtonClick("skill1", e)}
             >
-              <ButtonItem name="skill1" kind="skill" size="sm" stats={stats} priority />
+              <ButtonItem name="skill1" kind="skill" size="sm" stats={stats} priority currentCount={visualCounts.skill1} />
             </div>
             <div
               className="-translate-x-2"
               onClick={(e) => handleButtonClick("skill2", e)}
             >
-              <ButtonItem name="skill2" kind="skill" size="md" stats={stats} />
+              <ButtonItem name="skill2" kind="skill" size="md" stats={stats} currentCount={visualCounts.skill2} />
             </div>
             <div
               className="translate-x-1"
               onClick={(e) => handleButtonClick("skill3", e)}
             >
-              <ButtonItem name="skill3" kind="skill" size="lg" stats={stats} />
+              <ButtonItem name="skill3" kind="skill" size="lg" stats={stats} currentCount={visualCounts.skill3} />
             </div>
           </div>
 
@@ -257,19 +321,19 @@ export default function ButtonGrid({ onClick, stats }: Props) {
               className="-translate-x-1"
               onClick={(e) => handleButtonClick("enemy1", e)}
             >
-              <ButtonItem name="enemy1" kind="enemy" size="sm" stats={stats} />
+              <ButtonItem name="enemy1" kind="enemy" size="sm" stats={stats} currentCount={visualCounts.enemy1} />
             </div>
             <div
               className="translate-x-2"
               onClick={(e) => handleButtonClick("enemy2", e)}
             >
-              <ButtonItem name="enemy2" kind="enemy" size="md" stats={stats} />
+              <ButtonItem name="enemy2" kind="enemy" size="md" stats={stats} currentCount={visualCounts.enemy2} />
             </div>
             <div
               className="-translate-x-1"
               onClick={(e) => handleButtonClick("enemy3", e)}
             >
-              <ButtonItem name="enemy3" kind="enemy" size="lg" stats={stats} />
+              <ButtonItem name="enemy3" kind="enemy" size="lg" stats={stats} currentCount={visualCounts.enemy3} />
             </div>
           </div>
         </div>
@@ -281,19 +345,19 @@ export default function ButtonGrid({ onClick, stats }: Props) {
               className="translate-y-2"
               onClick={(e) => handleButtonClick("skill1", e)}
             >
-              <ButtonItem name="skill1" kind="skill" size="sm" stats={stats} priority />
+              <ButtonItem name="skill1" kind="skill" size="sm" stats={stats} priority currentCount={visualCounts.skill1} />
             </div>
             <div
               className="-translate-y-4"
               onClick={(e) => handleButtonClick("skill2", e)}
             >
-              <ButtonItem name="skill2" kind="skill" size="md" stats={stats} />
+              <ButtonItem name="skill2" kind="skill" size="md" stats={stats} currentCount={visualCounts.skill2} />
             </div>
             <div
               className="translate-y-2"
               onClick={(e) => handleButtonClick("skill3", e)}
             >
-              <ButtonItem name="skill3" kind="skill" size="lg" stats={stats} />
+              <ButtonItem name="skill3" kind="skill" size="lg" stats={stats} currentCount={visualCounts.skill3} />
             </div>
           </div>
 
@@ -302,19 +366,19 @@ export default function ButtonGrid({ onClick, stats }: Props) {
               className="-translate-y-2"
               onClick={(e) => handleButtonClick("enemy1", e)}
             >
-              <ButtonItem name="enemy1" kind="enemy" size="sm" stats={stats} />
+              <ButtonItem name="enemy1" kind="enemy" size="sm" stats={stats} currentCount={visualCounts.enemy1} />
             </div>
             <div
               className="translate-y-4"
               onClick={(e) => handleButtonClick("enemy2", e)}
             >
-              <ButtonItem name="enemy2" kind="enemy" size="md" stats={stats} />
+              <ButtonItem name="enemy2" kind="enemy" size="md" stats={stats} currentCount={visualCounts.enemy2} />
             </div>
             <div
               className="-translate-y-2"
               onClick={(e) => handleButtonClick("enemy3", e)}
             >
-              <ButtonItem name="enemy3" kind="enemy" size="lg" stats={stats} />
+              <ButtonItem name="enemy3" kind="enemy" size="lg" stats={stats} currentCount={visualCounts.enemy3} />
             </div>
           </div>
         </>
