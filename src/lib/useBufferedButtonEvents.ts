@@ -2,6 +2,7 @@ import {
   sendButtonEvents,
   type ButtonName,
   type GameOverResponse,
+  type RoomStat,
 } from "@/lib/api";
 import { useCallback, useEffect, useRef } from "react";
 
@@ -18,7 +19,7 @@ const BUTTON_NAMES: ButtonName[] = [
 /** イベント送信間隔（ミリ秒） */
 const FLUSH_INTERVAL_MS = 1500;
 /** ハートビート送信間隔（ミリ秒） */
-const HEARTBEAT_INTERVAL_MS = 6000;
+const HEARTBEAT_INTERVAL_MS = 1500;
 
 function createEmptyPushCounts(): Record<ButtonName, number> {
   // 全ボタンの押下カウントを初期化（ゼロ）
@@ -45,6 +46,8 @@ type BufferedEventsOptions = {
   gameOver: boolean;
   // ゲーム終了時のコールバック
   onGameOver: (payload: GameOverResponse) => void;
+  // 統計情報更新時のコールバック
+  onStatsUpdate?: (stats: RoomStat[]) => void;
 };
 
 export function useBufferedButtonEvents({
@@ -54,6 +57,7 @@ export function useBufferedButtonEvents({
   viewerName,
   gameOver,
   onGameOver,
+  onStatsUpdate,
 }: BufferedEventsOptions): (name: ButtonName) => void {
   // ボタン押下のペンディングカウント
   const pendingCountsRef = useRef<Record<ButtonName, number>>(
@@ -140,6 +144,11 @@ export function useBufferedButtonEvents({
         // 最後の送信時刻を更新
         lastFlushAtRef.current = Date.now();
 
+        // 統計情報の更新
+        if (response.stats && onStatsUpdate) {
+          onStatsUpdate(response.stats);
+        }
+
         // ゲーム終了レスポンスの処理
         if ("game_over" in response && response.game_over) {
           onGameOver(response);
@@ -181,7 +190,7 @@ export function useBufferedButtonEvents({
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [backendUrl, roomId, viewerId,viewerName, gameOver, onGameOver]);
+  }, [backendUrl, roomId, viewerId,viewerName, gameOver, onGameOver, onStatsUpdate]);
 
   // ボタン押下をキューに追加する関数を返す
   return queueButtonEvent;

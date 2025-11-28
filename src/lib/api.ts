@@ -34,8 +34,8 @@ export type PushEventPayload = {
 };
 
 export type SendButtonEventsResponse =
-  | { event_results: EventResultResponse[]; game_over?: false }
-  | (GameOverResponse & { event_results?: EventResultResponse[] });
+  | { event_results: EventResultResponse[]; stats: RoomStat[]; game_over?: false }
+  | (GameOverResponse & { event_results?: EventResultResponse[]; stats?: RoomStat[]; });
 
 export type ResultTopEntry = {
   viewer_id: string;
@@ -58,6 +58,23 @@ export type RoomResultResponse = {
   event_totals: Record<ButtonName, number>;
   viewer_totals: ViewerTotalsEntry[];
   viewer_summary?: ViewerSummaryPayload | null;
+};
+
+// 部屋の統計情報（1ボタンあたり）
+export type RoomStat = {
+  event_type: ButtonName;
+  current_count: number;
+  required_count: number;
+  remaining_count: number;
+  progress: number; // 0.0 〜 1.0
+  viewer_count: number;
+};
+
+// 統計APIのレスポンス
+export type RoomStatsResponse = {
+  room_id: string;
+  stats: RoomStat[];
+  time: string;
 };
 
 export async function fetchViewerIdentity(baseUrl: string): Promise<ViewerIdentity | null> {
@@ -95,6 +112,26 @@ export async function sendButtonEvents(params: {
       return null;
     }
     return res.json().catch(() => null) as Promise<SendButtonEventsResponse | null>;
+  } catch {
+    return null;
+  }
+}
+
+// 統計情報を取得する関数
+export async function fetchRoomStats(
+  baseUrl: string,
+  roomId: string
+): Promise<RoomStatsResponse | null> {
+  try {
+    const res = await fetch(
+      `${baseUrl}/api/rooms/${encodeURIComponent(roomId)}/stats`,
+      {
+        method: "GET",
+        cache: "no-store", // 常に最新を取得
+      }
+    );
+    if (!res.ok) return null;
+    return (await res.json().catch(() => null)) as RoomStatsResponse | null;
   } catch {
     return null;
   }
