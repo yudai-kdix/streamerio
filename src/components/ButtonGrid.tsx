@@ -1,6 +1,6 @@
 "use client";
 
-import type { ButtonName } from "@/lib/api";
+import type { ButtonName, RoomStat } from "@/lib/api";
 import { useVibration } from "@/lib/vibration";
 import bgPng from "@assets/background.png";
 import bgLandscapePng from "@assets/background_landscape.png";
@@ -13,6 +13,7 @@ import ParticleEffect from "./ParticleEffect";
 
 type Props = {
   onClick: (name: ButtonName) => void;
+  stats?: Record<ButtonName, RoomStat | undefined>;
 };
 
 type ParticleEvent = {
@@ -23,8 +24,121 @@ type ParticleEvent = {
   color: string;
 };
 
+// 数値を滑らかに補間するフック
+function useSmoothValue(targetValue: number, duration: number = 1000) {
+  const [displayValue, setDisplayValue] = useState(targetValue);
+  
+  const displayValueRef = useRef(targetValue);
+  const startValueRef = useRef(targetValue);
+  const targetValueRef = useRef(targetValue);
+  const startTimeRef = useRef<number | null>(null);
+  const reqIdRef = useRef<number | null>(null);
+
+  displayValueRef.current = displayValue;
+
+  useEffect(() => {
+    if (targetValue !== targetValueRef.current) {
+      startValueRef.current = displayValueRef.current;
+      targetValueRef.current = targetValue;
+      startTimeRef.current = null;
+    }
+
+    const loop = (time: number) => {
+      if (startTimeRef.current === null) startTimeRef.current = time;
+      const elapsed = time - startTimeRef.current;
+      
+      const progress = Math.min(elapsed / duration, 1.0);
+      const ease = 1 - Math.pow(1 - progress, 3); // Ease-out
+
+      const newValue =
+        startValueRef.current +
+        (targetValueRef.current - startValueRef.current) * ease;
+
+      setDisplayValue(newValue);
+
+      if (progress < 1.0) {
+        reqIdRef.current = requestAnimationFrame(loop);
+      } else {
+        reqIdRef.current = null;
+      }
+    };
+
+    reqIdRef.current = requestAnimationFrame(loop);
+    return () => {
+      if (reqIdRef.current) cancelAnimationFrame(reqIdRef.current);
+    };
+  }, [targetValue, duration]);
+
+  return displayValue;
+}
+
+// ボタン単体のコンポーネント
+const ButtonItem = ({
+  name,
+  kind,
+  size,
+  stats,
+  priority,
+}: {
+  name: ButtonName;
+  kind: "skill" | "enemy";
+  size: "sm" | "md" | "lg";
+  stats?: Record<ButtonName, RoomStat | undefined>;
+  priority?: boolean;
+}) => {
+  const boxCls =
+    "relative w-[clamp(80px,22vmin,140px)] h-[clamp(80px,22vmin,140px)]";
+  const btnCls =
+    "cursor-pointer transition-transform duration-150 active:scale-95 select-none";
+  
+  const pad =
+    size === "sm"
+      ? kind === "enemy" ? "p-6" : "p-5"
+      : size === "md"
+      ? kind === "enemy" ? "p-4" : "p-3"
+      : kind === "enemy" ? "p-2" : "p-1";
+      
+  const icon = kind === "skill" ? skillIcon : enemyIcon;
+  const barColor = kind === "skill" ? "bg-yellow-400" : "bg-red-500";
+
+  const stat = stats?.[name];
+  const rawProgress = stat?.progress ?? 0;
+
+  // アニメーション適用 (800ms)
+  const smoothProgress = useSmoothValue(rawProgress, 800);
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <div className={boxCls}>
+        <Image
+          src={buttonPng}
+          alt="button"
+          fill
+          className={`object-contain ${btnCls}`}
+          priority={priority}
+        />
+        <Image
+          src={icon}
+          alt={kind}
+          fill
+          className={`object-contain ${pad} pointer-events-none`}
+        />
+      </div>
+
+      <div className="w-[90%] flex flex-col items-center gap-0.5">
+        <div className="relative w-full h-3 bg-black/60 rounded-full overflow-hidden border border-white/20 backdrop-blur-sm shadow-inner">
+          <div
+            className={`h-full ${barColor} shadow-[0_0_10px_rgba(255,255,255,0.4)]`}
+            style={{ width: `${Math.min(smoothProgress * 100, 100)}%` }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // 6 つのボタンを所定の配置で描画する（Tailwind ベース）
-export default function ButtonGrid({ onClick }: Props) {
+export default function ButtonGrid({ onClick, stats }: Props) {
   const [isLandscape, setIsLandscape] = useState(false);
   const [particles, setParticles] = useState<ParticleEvent[]>([]);
   const { vibrate } = useVibration();
@@ -95,45 +209,6 @@ export default function ButtonGrid({ onClick }: Props) {
   const boxCls =
     "relative w-[clamp(80px,22vmin,140px)] h-[clamp(80px,22vmin,140px)]";
 
-  // ボタン＋アイコンの描画（size: sm|md|lg）
-  const renderButton = (
-    kind: "skill" | "enemy",
-    size: "sm" | "md" | "lg",
-    opts?: { priority?: boolean }
-  ) => {
-    // アイコンを一回り小さくするためパディングを増やす
-    const pad =
-      size === "sm"
-        ? kind === "enemy"
-          ? "p-6"
-          : "p-5"
-        : size === "md"
-        ? kind === "enemy"
-          ? "p-4"
-          : "p-3"
-        : kind === "enemy"
-        ? "p-2"
-        : "p-1";
-    const icon = kind === "skill" ? skillIcon : enemyIcon;
-    return (
-      <div className={boxCls}>
-        <Image
-          src={buttonPng}
-          alt="button"
-          fill
-          className={`object-contain ${btnCls}`}
-          priority={opts?.priority}
-        />
-        <Image
-          src={icon}
-          alt={kind}
-          fill
-          className={`object-contain ${pad} pointer-events-none`}
-        />
-      </div>
-    );
-  };
-
   return (
     <main
       className="relative flex-1 h-full flex flex-col items-center justify-center bg-cover bg-center overflow-hidden"
@@ -160,19 +235,19 @@ export default function ButtonGrid({ onClick }: Props) {
               className="translate-x-1"
               onClick={(e) => handleButtonClick("skill1", e)}
             >
-              {renderButton("skill", "sm", { priority: true })}
+              <ButtonItem name="skill1" kind="skill" size="sm" stats={stats} priority />
             </div>
             <div
               className="-translate-x-2"
               onClick={(e) => handleButtonClick("skill2", e)}
             >
-              {renderButton("skill", "md")}
+              <ButtonItem name="skill2" kind="skill" size="md" stats={stats} />
             </div>
             <div
               className="translate-x-1"
               onClick={(e) => handleButtonClick("skill3", e)}
             >
-              {renderButton("skill", "lg")}
+              <ButtonItem name="skill3" kind="skill" size="lg" stats={stats} />
             </div>
           </div>
 
@@ -182,19 +257,19 @@ export default function ButtonGrid({ onClick }: Props) {
               className="-translate-x-1"
               onClick={(e) => handleButtonClick("enemy1", e)}
             >
-              {renderButton("enemy", "sm")}
+              <ButtonItem name="enemy1" kind="enemy" size="sm" stats={stats} />
             </div>
             <div
               className="translate-x-2"
               onClick={(e) => handleButtonClick("enemy2", e)}
             >
-              {renderButton("enemy", "md")}
+              <ButtonItem name="enemy2" kind="enemy" size="md" stats={stats} />
             </div>
             <div
               className="-translate-x-1"
               onClick={(e) => handleButtonClick("enemy3", e)}
             >
-              {renderButton("enemy", "lg")}
+              <ButtonItem name="enemy3" kind="enemy" size="lg" stats={stats} />
             </div>
           </div>
         </div>
@@ -206,19 +281,19 @@ export default function ButtonGrid({ onClick }: Props) {
               className="translate-y-2"
               onClick={(e) => handleButtonClick("skill1", e)}
             >
-              {renderButton("skill", "sm", { priority: true })}
+              <ButtonItem name="skill1" kind="skill" size="sm" stats={stats} priority />
             </div>
             <div
               className="-translate-y-4"
               onClick={(e) => handleButtonClick("skill2", e)}
             >
-              {renderButton("skill", "md")}
+              <ButtonItem name="skill2" kind="skill" size="md" stats={stats} />
             </div>
             <div
               className="translate-y-2"
               onClick={(e) => handleButtonClick("skill3", e)}
             >
-              {renderButton("skill", "lg")}
+              <ButtonItem name="skill3" kind="skill" size="lg" stats={stats} />
             </div>
           </div>
 
@@ -227,19 +302,19 @@ export default function ButtonGrid({ onClick }: Props) {
               className="-translate-y-2"
               onClick={(e) => handleButtonClick("enemy1", e)}
             >
-              {renderButton("enemy", "sm")}
+              <ButtonItem name="enemy1" kind="enemy" size="sm" stats={stats} />
             </div>
             <div
               className="translate-y-4"
               onClick={(e) => handleButtonClick("enemy2", e)}
             >
-              {renderButton("enemy", "md")}
+              <ButtonItem name="enemy2" kind="enemy" size="md" stats={stats} />
             </div>
             <div
               className="-translate-y-2"
               onClick={(e) => handleButtonClick("enemy3", e)}
             >
-              {renderButton("enemy", "lg")}
+              <ButtonItem name="enemy3" kind="enemy" size="lg" stats={stats} />
             </div>
           </div>
         </>
