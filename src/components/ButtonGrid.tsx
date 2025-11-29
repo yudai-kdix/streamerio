@@ -5,8 +5,12 @@ import { useVibration } from "@/lib/vibration";
 import bgPng from "@assets/background.png";
 import bgLandscapePng from "@assets/background_landscape.png";
 import buttonPng from "@assets/button.png";
-import enemyIcon from "@assets/enemy.png";
-import skillIcon from "@assets/skill.png";
+import enemy1Img from "@assets/enemy1.png";
+import enemy2Img from "@assets/enemy2.png";
+import enemy3Img from "@assets/enemy3.png";
+import skill1Img from "@assets/skill1.png";
+import skill2Img from "@assets/skill2.png";
+import skill3Img from "@assets/skill3.png";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ParticleEffect from "./ParticleEffect";
@@ -100,7 +104,27 @@ const ButtonItem = ({
       ? kind === "enemy" ? "p-4" : "p-3"
       : kind === "enemy" ? "p-2" : "p-1";
       
-  const icon = kind === "skill" ? skillIcon : enemyIcon;
+  const iconMap: Record<ButtonName, any> = {
+  skill1: skill1Img,
+  skill2: skill2Img,
+  skill3: skill3Img,
+  enemy1: enemy1Img,
+  enemy2: enemy2Img,
+  enemy3: enemy3Img,
+};
+const icon = iconMap[name];
+// サイズ・スタイル調整マップ
+// skill1: 小さくする -> パディングを増やす
+// skill2,3, enemy2,3: 大きくする -> パディング0 + scale拡大
+const iconStyleMap: Partial<Record<ButtonName, string>> = {
+  skill1: "p-7", 
+  skill2: "p-0 scale-110 -translate-x-2",
+  skill3: "p-0 scale-125 -translate-y-2",
+  enemy2: "p-0 scale-125 -translate-y-2",
+  enemy3: "p-0 scale-150 -translate-y-2",
+};
+const customStyle = iconStyleMap[name];
+const finalStyle = customStyle ?? pad;
   const barColor = kind === "skill" ? "bg-yellow-400" : "bg-red-500";
 
   const stat = stats?.[name];
@@ -131,7 +155,7 @@ const ButtonItem = ({
           src={icon}
           alt={kind}
           fill
-          className={`object-contain ${pad} pointer-events-none`}
+          className={`object-contain ${finalStyle} pointer-events-none`}
         />
       </div>
 
