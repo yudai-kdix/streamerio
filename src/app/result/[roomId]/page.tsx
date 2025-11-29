@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { fetchRoomResult, type ButtonName, type RoomResultResponse } from "@/lib/api";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
-import { fetchRoomResult, type ButtonName, type RoomResultResponse } from "@/lib/api";
+import { useEffect, useMemo, useState } from "react";
 
 const buttonLabels: Record<ButtonName, string> = {
   skill1: "スキルボタン1",
@@ -81,6 +81,35 @@ export default function ResultPage() {
       <header className="px-4 py-4 border-b border-white/10">
         <h1 className="text-2xl font-semibold">ゲーム結果</h1>
         <p className="text-sm text-white/70">ルームID: {roomId}</p>
+        {/* 2025/11/30 限定のプロモーションリンク */}
+        {new Date().getFullYear() === 2025 && new Date().getMonth() === 10 && new Date().getDate() === 30 && (
+          <div className="mt-4 animate-fade-in">
+            <a
+              href="https://acute-puck-a9c.notion.site/Streamerio-2b990e973c9780d3ad3adecb2656287d"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex items-center gap-3 rounded-xl bg-gradient-to-r from-neutral-800 to-neutral-900 border border-white/20 p-4 shadow-lg transition-all hover:scale-[1.02] hover:border-white/40 hover:shadow-xl"
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-black">
+                <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 fill-current">
+                  <title>Notion</title>
+                  <path d="M4.459 4.208c.746.606 1.026.56 2.428.466l13.215-.793c.28 0 .047-.28.047-.606 0-.84-.234-1.494-2.195-1.635L4.786 1.04C2.546.853 2.173 1.553 2.173 3.093v16.74c0 2.287 2.053 2.894 3.78 2.894 1.074 0 2.195-.187 2.195-.187v-7.653l-3.69-2.68V4.208zM9.68 21.035h1.96V9.54L9.68 10.94v10.095zm3.593 0h2.007V7.953l-2.007 1.353v11.729zm3.64 0h2.147V6.366l-2.147 1.4v13.269z" />
+                </svg>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-base font-bold text-white group-hover:text-emerald-400 transition-colors">
+                  開発の裏話はこちら！
+                </span>
+                <span className="text-xs text-white/60">
+                  Notionで開発秘話を公開中
+                </span>
+              </div>
+              <div className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform">
+                →
+              </div>
+            </a>
+          </div>
+        )}
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-8 space-y-8">
