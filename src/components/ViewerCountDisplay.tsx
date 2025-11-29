@@ -10,48 +10,27 @@ export default function ViewerCountDisplay({ latestCount }: ViewerCountDisplayPr
   const requestRef = useRef<number>();
   const startTimeRef = useRef<number>(0);
 
-  useEffect(() => {
-    if (latestCount !== null) {
-      setHistory((prev) => {
-        const newHistory = [...prev, latestCount];
-        // Keep enough history to go back 2 steps
-        // We need at least 3 items to do "2 ago -> 1 ago" when we have the latest
-        // [n-2, n-1, n]
-        if (newHistory.length > 3) {
-          return newHistory.slice(newHistory.length - 3);
-        }
-        return newHistory;
-      });
-    }
-  }, [latestCount]);
-
   const currentValueRef = useRef(0);
 
   useEffect(() => {
-    // Need at least 3 items to follow "2 times ago -> 1 time ago" logic strictly
-    // If we have [A, B, C], we animate A -> B.
-    
-    let endValue = 0;
+    if (latestCount === null) return;
 
-    if (history.length >= 3) {
-      endValue = history[history.length - 2];
-    } else if (history.length === 2) {
-      endValue = history[1];
-    } else if (history.length === 1) {
-      setDisplayValue(history[0]);
-      currentValueRef.current = history[0];
-      return;
-    } else {
+    const endValue = latestCount;
+    const startValue = currentValueRef.current;
+
+    // If this is the first value, set immediately
+    if (history.length === 0) {
+      setDisplayValue(endValue);
+      currentValueRef.current = endValue;
+      setHistory([endValue]);
       return;
     }
 
-    // Start from the current animated value to avoid jumps
-    const startValue = currentValueRef.current;
-    
-    // Make duration longer than fetch interval (1500ms) to avoid "stops"
-    // The animation will be interrupted by the next update before it finishes,
-    // creating a continuous motion.
-    const duration = 3000; 
+    setHistory(prev => [...prev, endValue]);
+
+    // Animate to the new value
+    // Duration slightly longer than fetch interval (1500ms) to keep it moving
+    const duration = 2000;
     startTimeRef.current = Date.now();
 
     const animate = () => {
@@ -59,20 +38,26 @@ export default function ViewerCountDisplay({ latestCount }: ViewerCountDisplayPr
       const elapsed = now - startTimeRef.current;
       const progress = Math.min(elapsed / duration, 1);
 
-      // Linear interpolation
-      const current = startValue + (endValue - startValue) * progress;
+      // Ease-out expo for nicer feeling
+      // const ease = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
+      // Linear is fine for continuous updates, but let's try simple ease-out
+      const ease = 1 - Math.pow(1 - progress, 3);
+
+      const current = startValue + (endValue - startValue) * ease;
       setDisplayValue(Math.floor(current));
       currentValueRef.current = current;
 
       if (progress < 1) {
         requestRef.current = requestAnimationFrame(animate);
       } else {
-        // Ensure we land exactly on endValue
         setDisplayValue(endValue);
         currentValueRef.current = endValue;
       }
     };
 
+    if (requestRef.current) {
+      cancelAnimationFrame(requestRef.current);
+    }
     requestRef.current = requestAnimationFrame(animate);
 
     return () => {
@@ -80,7 +65,7 @@ export default function ViewerCountDisplay({ latestCount }: ViewerCountDisplayPr
         cancelAnimationFrame(requestRef.current);
       }
     };
-  }, [history]);
+  }, [latestCount]);
 
   if (history.length === 0) return null;
 
