@@ -5,59 +5,65 @@ interface ViewerCountDisplayProps {
 }
 
 export default function ViewerCountDisplay({ latestCount }: ViewerCountDisplayProps) {
-  const [history, setHistory] = useState<number[]>([]);
   const [displayValue, setDisplayValue] = useState(0);
-  const requestRef = useRef<number>();
-  const startTimeRef = useRef<number>(0);
-
+  
+  // アニメーション用の現在値（浮動小数点数）
   const currentValueRef = useRef(0);
+  // 目標値
+  const targetValueRef = useRef(0);
+  // アニメーションループのID
+  const requestRef = useRef<number>();
 
   useEffect(() => {
-    if (latestCount === null) return;
-
-    const endValue = latestCount;
-    const startValue = currentValueRef.current;
-
-    // If this is the first value, set immediately
-    if (history.length === 0) {
-      setDisplayValue(endValue);
-      currentValueRef.current = endValue;
-      setHistory([endValue]);
-      return;
-    }
-
-    setHistory(prev => [...prev, endValue]);
-
-    // Animate to the new value
-    // Duration slightly longer than fetch interval (1500ms) to keep it moving
-    const duration = 2000;
-    startTimeRef.current = Date.now();
-
-    const animate = () => {
-      const now = Date.now();
-      const elapsed = now - startTimeRef.current;
-      const progress = Math.min(elapsed / duration, 1);
-
-      // Ease-out expo for nicer feeling
-      // const ease = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
-      // Linear is fine for continuous updates, but let's try simple ease-out
-      const ease = 1 - Math.pow(1 - progress, 3);
-
-      const current = startValue + (endValue - startValue) * ease;
-      setDisplayValue(Math.floor(current));
-      currentValueRef.current = current;
-
-      if (progress < 1) {
-        requestRef.current = requestAnimationFrame(animate);
-      } else {
-        setDisplayValue(endValue);
-        currentValueRef.current = endValue;
+    if (latestCount !== null) {
+      targetValueRef.current = latestCount;
+      
+      // 初回ロード時は即座に反映
+      if (currentValueRef.current === 0 && displayValue === 0) {
+        currentValueRef.current = latestCount;
+        setDisplayValue(latestCount);
       }
+    }
+  }, [latestCount, displayValue]);
+
+  useEffect(() => {
+    const animate = () => {
+      const target = targetValueRef.current;
+      const current = currentValueRef.current;
+      
+      // 差分を計算
+      const diff = target - current;
+      
+      // 差分が十分に小さい場合は目標値に固定して停止（CPU負荷軽減）
+      // ただし、閾値を小さくしすぎると「止まった」感が出るので調整
+      if (Math.abs(diff) < 0.1) {
+        if (current !== target) {
+          currentValueRef.current = target;
+          setDisplayValue(target);
+        }
+        // ループは継続せず、次の更新を待つ（またはuseEffectの依存で再開）
+        // ここではシンプルにループを止めず、次のフレームもチェックする形にするが、
+        // 実際には動きがないなら描画更新しない方が良い。
+        requestRef.current = requestAnimationFrame(animate);
+        return;
+      }
+
+      // Lerp (線形補間)
+      // 係数 0.02: 60fpsの場合、1秒で約70%進む、2秒で約90%進む。
+      // 1.5秒間隔でデータが来ても、まだ完全に追いついていないため、動きが止まらない。
+      const factor = 0.02;
+      const nextValue = current + diff * factor;
+
+      currentValueRef.current = nextValue;
+      
+      // 表示用に整数化（Math.floorだと増減で挙動が違うのでMath.round推奨だが、
+      // 元コードに合わせて一旦floorにするか、見た目の安定性でroundにする）
+      // ここでは四捨五入(Math.round)を採用
+      setDisplayValue(Math.round(nextValue));
+
+      requestRef.current = requestAnimationFrame(animate);
     };
 
-    if (requestRef.current) {
-      cancelAnimationFrame(requestRef.current);
-    }
     requestRef.current = requestAnimationFrame(animate);
 
     return () => {
@@ -65,9 +71,9 @@ export default function ViewerCountDisplay({ latestCount }: ViewerCountDisplayPr
         cancelAnimationFrame(requestRef.current);
       }
     };
-  }, [latestCount]);
+  }, []);
 
-  if (history.length === 0) return null;
+  if (latestCount === null && displayValue === 0) return null;
 
   return (
     <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
