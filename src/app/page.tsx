@@ -18,6 +18,8 @@ import { getCookie, setCookie } from "@/lib/cookies";
 import { useBufferedButtonEvents } from "@/lib/useBufferedButtonEvents";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import torisetu from "@assets/torisetu.png";
+import streamerio from "@assets/streamerio.png";
 
 // 検索パラメータに依存する実処理を分離（Suspense でラップ）
 function ViewerContent() {
@@ -197,27 +199,28 @@ function ViewerContent() {
       {
         id: "intro",
         title: "Streamerio へようこそ",
-        description: "なんか書く。操作説明は後からでもヘッダーの ? アイコンから再表示できます。",
+        description: "",
         media: (
           <div className="w-full h-full flex items-center justify-center text-white/60 text-sm px-6 text-center">
-            Gifとか置くイメージ
+            <img src={torisetu.src} alt="説明書" className="w-full h-full object-contain" />
+            
           </div>
         ),
       },
-      {
-        id: "buttons",
-        title: "スキル / エネミーを押す",
-        description: "画面中央の 6 つのボタンをタップすると、配信者側にイベントが送信されます。",
-        media: (
-          <div className="w-full h-full bg-gradient-to-br from-emerald-500/20 to-cyan-500/10 flex items-center justify-center text-center text-white/70 text-sm px-4">
-            実際のプレイ GIF とか？。
-          </div>
-        ),
-      },
+      // {
+      //   id: "buttons",
+      //   title: "スキル / エネミーを押す",
+      //   description: "画面中央の 6 つのボタンをタップすると、配信者側にイベントが送信されます。",
+      //   media: (
+      //     <div className="w-full h-full bg-gradient-to-br from-emerald-500/20 to-cyan-500/10 flex items-center justify-center text-center text-white/70 text-sm px-4">
+      //       実際のプレイ GIF とか？。
+      //     </div>
+      //   ),
+      // },
       {
         id: "name",
         title: "表示名を入力",
-        description: "リザルトにも表示される大事な名前です。保存してからゲームに参加しましょう。",
+        description: "",
         content: (
           <form
             className="space-y-3"
@@ -227,7 +230,7 @@ function ViewerContent() {
             }}
           >
             <label className="text-sm text-white/80" htmlFor="guide-viewer-name">
-              表示名
+              表示名を入力してください
             </label>
             <input
               id="guide-viewer-name"
@@ -241,6 +244,12 @@ function ViewerContent() {
             />
             <p className="text-xs text-white/60">保存後はいつでもヘッダーから変更できます。</p>
           </form>
+        ),
+        media: (
+          <div className="w-full h-full flex items-center justify-center text-white/60 text-sm px-6 text-center">
+            <img src={streamerio.src} alt="streamerio" className="w-full h-full object-contain" />
+            
+          </div>
         ),
         nextLabel: hasRegisteredName ? "閉じる" : savingName ? "保存中..." : "保存して開始",
         nextDisabled: !hasRegisteredName && (!isNameValid || savingName),
