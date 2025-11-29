@@ -34,7 +34,7 @@ export type PushEventPayload = {
 };
 
 export type SendButtonEventsResponse =
-  | { event_results: EventResultResponse[]; stats: RoomStat[]; game_over?: false }
+  | { event_results: EventResultResponse[]; stats: RoomStat[]; viewer_count?: number; game_over?: false }
   | (GameOverResponse & { event_results?: EventResultResponse[]; stats?: RoomStat[]; });
 
 export type ResultTopEntry = {
@@ -96,7 +96,7 @@ export async function sendButtonEvents(params: {
   viewerName?: string | null;
   pushEvents: PushEventPayload[];
 }): Promise<SendButtonEventsResponse | null> {
-  const { baseUrl, roomId, viewerId,viewerName, pushEvents } = params;
+  const { baseUrl, roomId, viewerId, viewerName, pushEvents } = params;
   const url = `${baseUrl}/api/rooms/${encodeURIComponent(roomId)}/events`;
   try {
     const res = await fetch(url, {
@@ -104,7 +104,7 @@ export async function sendButtonEvents(params: {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         viewer_id: viewerId,
-        viewer_name:viewerName,
+        viewer_name: viewerName,
         push_events: pushEvents,
       }),
     });
@@ -169,5 +169,23 @@ export async function updateViewerName(params: {
     return await res.json().catch(() => null);
   } catch {
     return null;
+  }
+}
+
+export async function joinRoom(params: {
+  baseUrl: string;
+  roomId: string;
+  viewerId: string;
+}): Promise<boolean> {
+  const { baseUrl, roomId, viewerId } = params;
+  try {
+    const res = await fetch(`${baseUrl}/api/rooms/${encodeURIComponent(roomId)}/join`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ viewer_id: viewerId }),
+    });
+    return res.ok;
+  } catch {
+    return false;
   }
 }
