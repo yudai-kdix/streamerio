@@ -42,7 +42,7 @@ type BufferedEventsOptions = {
   // 視聴者ID
   viewerId: string | null | undefined;
   // 視聴者名
-  viewerName:string| null | undefined;
+  viewerName: string | null | undefined;
   // ゲーム終了状態
   gameOver: boolean;
   // ゲーム終了時のコールバック
@@ -146,10 +146,14 @@ export function useBufferedButtonEvents({
         }
 
         // 視聴者数の更新
-        if (onViewerCountUpdate && response.event_results && response.event_results.length > 0) {
-          // どのイベント結果にも同じ視聴者数が入っているはずなので先頭を使用
-          const count = response.event_results[0].viewer_count;
-          onViewerCountUpdate(count);
+        if (onViewerCountUpdate) {
+          if ("viewer_count" in response && typeof response.viewer_count === "number") {
+            onViewerCountUpdate(response.viewer_count);
+          } else if (response.event_results && response.event_results.length > 0) {
+            // 後方互換性: イベント結果から取得
+            const count = response.event_results[0].viewer_count;
+            onViewerCountUpdate(count);
+          }
         }
 
         // 統計情報の更新
