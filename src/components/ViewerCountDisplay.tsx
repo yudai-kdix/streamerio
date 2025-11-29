@@ -5,72 +5,63 @@ interface ViewerCountDisplayProps {
 }
 
 export default function ViewerCountDisplay({ latestCount }: ViewerCountDisplayProps) {
-  const [history, setHistory] = useState<number[]>([]);
   const [displayValue, setDisplayValue] = useState(0);
+  
+  // アニメーション用の現在値（浮動小数点数）
+  const currentValueRef = useRef(0);
+  // 目標値
+  const targetValueRef = useRef(0);
+  // アニメーションループのID
   const requestRef = useRef<number>();
-  const startTimeRef = useRef<number>(0);
 
   useEffect(() => {
     if (latestCount !== null) {
-      setHistory((prev) => {
-        const newHistory = [...prev, latestCount];
-        // Keep enough history to go back 2 steps
-        // We need at least 3 items to do "2 ago -> 1 ago" when we have the latest
-        // [n-2, n-1, n]
-        if (newHistory.length > 3) {
-          return newHistory.slice(newHistory.length - 3);
-        }
-        return newHistory;
-      });
+      targetValueRef.current = latestCount;
+      
+      // 初回ロード時は即座に反映
+      if (currentValueRef.current === 0 && displayValue === 0) {
+        currentValueRef.current = latestCount;
+        setDisplayValue(latestCount);
+      }
     }
-  }, [latestCount]);
-
-  const currentValueRef = useRef(0);
+  }, [latestCount, displayValue]);
 
   useEffect(() => {
-    // Need at least 3 items to follow "2 times ago -> 1 time ago" logic strictly
-    // If we have [A, B, C], we animate A -> B.
-    
-    let endValue = 0;
-
-    if (history.length >= 3) {
-      endValue = history[history.length - 2];
-    } else if (history.length === 2) {
-      endValue = history[1];
-    } else if (history.length === 1) {
-      setDisplayValue(history[0]);
-      currentValueRef.current = history[0];
-      return;
-    } else {
-      return;
-    }
-
-    // Start from the current animated value to avoid jumps
-    const startValue = currentValueRef.current;
-    
-    // Make duration longer than fetch interval (1500ms) to avoid "stops"
-    // The animation will be interrupted by the next update before it finishes,
-    // creating a continuous motion.
-    const duration = 3000; 
-    startTimeRef.current = Date.now();
-
     const animate = () => {
-      const now = Date.now();
-      const elapsed = now - startTimeRef.current;
-      const progress = Math.min(elapsed / duration, 1);
-
-      // Linear interpolation
-      const current = startValue + (endValue - startValue) * progress;
-      setDisplayValue(Math.floor(current));
-      currentValueRef.current = current;
-
-      if (progress < 1) {
+      const target = targetValueRef.current;
+      const current = currentValueRef.current;
+      
+      // 差分を計算
+      const diff = target - current;
+      
+      // 差分が十分に小さい場合は目標値に固定して停止（CPU負荷軽減）
+      // ただし、閾値を小さくしすぎると「止まった」感が出るので調整
+      if (Math.abs(diff) < 0.1) {
+        if (current !== target) {
+          currentValueRef.current = target;
+          setDisplayValue(target);
+        }
+        // ループは継続せず、次の更新を待つ（またはuseEffectの依存で再開）
+        // ここではシンプルにループを止めず、次のフレームもチェックする形にするが、
+        // 実際には動きがないなら描画更新しない方が良い。
         requestRef.current = requestAnimationFrame(animate);
-      } else {
-        // Ensure we land exactly on endValue
-        setDisplayValue(endValue);
-        currentValueRef.current = endValue;
+        return;
       }
+
+      // Lerp (線形補間)
+      // 係数 0.02: 60fpsの場合、1秒で約70%進む、2秒で約90%進む。
+      // 1.5秒間隔でデータが来ても、まだ完全に追いついていないため、動きが止まらない。
+      const factor = 0.02;
+      const nextValue = current + diff * factor;
+
+      currentValueRef.current = nextValue;
+      
+      // 表示用に整数化（Math.floorだと増減で挙動が違うのでMath.round推奨だが、
+      // 元コードに合わせて一旦floorにするか、見た目の安定性でroundにする）
+      // ここでは四捨五入(Math.round)を採用
+      setDisplayValue(Math.round(nextValue));
+
+      requestRef.current = requestAnimationFrame(animate);
     };
 
     requestRef.current = requestAnimationFrame(animate);
@@ -80,9 +71,9 @@ export default function ViewerCountDisplay({ latestCount }: ViewerCountDisplayPr
         cancelAnimationFrame(requestRef.current);
       }
     };
-  }, [history]);
+  }, []);
 
-  if (history.length === 0) return null;
+  if (latestCount === null && displayValue === 0) return null;
 
   return (
     <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 pointer-events-none">

@@ -12,6 +12,7 @@ import {
   type ButtonName,
   type GameOverResponse,
   type RoomStat,
+  joinRoom,
 } from "@/lib/api";
 import { getCookie, setCookie } from "@/lib/cookies";
 import { useBufferedButtonEvents } from "@/lib/useBufferedButtonEvents";
@@ -91,6 +92,15 @@ function ViewerContent() {
     }
     ensureViewer();
   }, [paramStreamerId, backendUrl, ensureViewer]);
+
+  // ルーム参加通知 (QRスキャン時など)
+  useEffect(() => {
+    if (!backendUrl || !streamerId || !viewerId) return;
+    // 一度だけ実行したいが、依存配列が変わると再実行される。
+    // 冪等性はあるので複数回呼ばれても問題ないが、Refで抑制しても良い。
+    // ここではシンプルに呼ぶ。
+    joinRoom({ baseUrl: backendUrl, roomId: streamerId, viewerId });
+  }, [backendUrl, streamerId, viewerId]);
 
   const handleGameOver = useCallback(
     (payload: GameOverResponse) => {
